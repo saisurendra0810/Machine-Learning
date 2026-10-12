@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Credit Card Fraud Detection</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+<div class="page">
+  <section class="hero">
+    <div class="eyebrow">SMART TRANSACTION ANALYSIS</div>
+    <h1>Detect suspicious transactions in<br>seconds.</h1>
+    <p>Enter transaction details and let the machine-learning model classify the transaction as <b>SAFE</b> or <b>FRAUD</b>.</p>
+  </section>
+
+  <section class="card main-card">
+    <div class="section-label">MODEL</div>
+    <h2>Choose detection model</h2>
+    <div class="model-tabs">
+      <button class="model-tab active" data-model="Logistic Regression">Logistic Regression</button>
+      <button class="model-tab" data-model="SVM">SVM</button>
+      <button class="model-tab" data-model="Isolation Forest">Isolation Forest</button>
+    </div>
+
+    <div class="section-label transaction-label">TRANSACTION</div>
+    <h2>Enter transaction details</h2>
+    <form id="fraudForm">
+      <div class="form-grid">
+        <label>Amount (USD)<input name="amount_usd" type="number" step="0.01" placeholder="Enter amount" required></label>
+        {% for col in ["merchant_category", "card_type"] %}
+        <label>{{ col.replace("_", " ").title() }}
+          <select name="{{ col }}">{% for value in categories[col] %}<option value="{{ value }}">{{ value }}</option>{% endfor %}</select>
+        </label>
+        {% endfor %}
+
+        {% for col in ["auth_method", "channel", "device_type"] %}
+        <label>{{ col.replace("_", " ").title() }}
+          <select name="{{ col }}">{% for value in categories[col] %}<option value="{{ value }}">{{ value }}</option>{% endfor %}</select>
+        </label>
+        {% endfor %}
+
+        <label>Hours Since Last Transaction<input name="hours_since_last_txn" type="number" step="0.01" placeholder="Enter hours" required></label>
+        <label>Transactions In Last 24h<input name="txn_count_last_24h" type="number" placeholder="Enter count" required></label>
+        <label>Distance From Home (km)<input name="distance_from_home_km" type="number" step="0.01" placeholder="Enter distance" required></label>
+        <label>Card Age (months)<input name="card_age_months" type="number" placeholder="Enter months" required></label>
+        <label>Customer Age<input name="customer_age" type="number" placeholder="Enter age" required></label>
+        <label>Account Balance (USD)<input name="account_balance_usd" type="number" step="0.01" placeholder="Enter balance" required></label>
+        <label>CVV Retry Count<input name="cvv_retry_count" type="number" placeholder="Enter count" required></label>
+        <label>Velocity Score<input name="velocity_score" type="number" step="0.01" placeholder="Enter score" required></label>
+        <label>Time of Day (0-23)<input name="time_of_day_hour" type="number" min="0" max="23" placeholder="0-23" required></label>
+        <label>Merchant Risk Score<input name="merchant_risk_score" type="number" step="0.01" placeholder="Enter score" required></label>
+        <label>Prior Disputes<input name="prior_disputes" type="number" placeholder="Enter count" required></label>
+
+        {% for col in ["is_foreign_transaction", "is_new_merchant", "used_vpn", "ip_country_mismatch", "billing_shipping_mismatch", "is_ai_generated_scam_attempt"] %}
+        <label>{{ col.replace("_", " ").replace("Is ", "").title() }}?
+          <select name="{{ col }}"><option value="0">No</option><option value="1">Yes</option></select>
+        </label>
+        {% endfor %}
+        <label>Day of Week<select name="day_of_week"><option value="0">0 (0=Mon, 6=Sun)</option><option value="1">1 (Tuesday)</option><option value="2">2 (Wednesday)</option><option value="3">3 (Thursday)</option><option value="4">4 (Friday)</option><option value="5">5 (Saturday)</option><option value="6">6 (Sunday)</option></select></label>
+      </div>
+      <button class="detect" type="submit">🔍&nbsp; Detect Fraud</button>
+    </form>
+    <div id="result" class="result hidden"></div>
+  </section>
+
+  <section id="metricsSection" class="metric-section hidden">
+    <div class="section-label">EVALUATION METRICS</div>
+    <h2>Model performance</h2>
+    <div class="metric-grid">
+      {% for name, m in metrics.items() %}
+      <div class="metric-card">
+        <div class="metric-head"><strong>{{ name }}</strong><span>Test Set</span></div>
+        <div class="metric-row"><span>Accuracy</span><b>{{ m.accuracy }}%</b><div class="bar"><i style="width:{{ m.accuracy }}%"></i></div></div>
+        <div class="metric-row"><span>Precision</span><b>{{ m.precision }}%</b><div class="bar"><i style="width:{{ m.precision }}%"></i></div></div>
+        <div class="metric-row"><span>Recall</span><b>{{ m.recall }}%</b><div class="bar"><i style="width:{{ m.recall }}%"></i></div></div>
+        <div class="metric-row"><span>F1 Score</span><b>{{ m.f1 }}%</b><div class="bar"><i style="width:{{ m.f1 }}%"></i></div></div>
+        <div class="metric-row"><span>AUC-ROC</span><b>{{ m.roc_auc }}%</b><div class="bar"><i style="width:{{ m.roc_auc }}%"></i></div></div>
+        <div class="metric-row"><span>Log Loss</span><b>{{ m.log_loss }}</b></div>
+        <div class="metric-row"><span>MAE</span><b>{{ m.mae }}</b></div>
+        <div class="metric-row"><span>MSE</span><b>{{ m.mse }}</b></div>
+        <div class="metric-row"><span>RMSE</span><b>{{ m.rmse }}</b></div>
+        <div class="metric-row"><span>R²</span><b>{{ m.r2 }}</b></div>
+        <div class="metric-row"><span>Adjusted R²</span><b>{{ m.adjusted_r2 if m.adjusted_r2 is not none else "N/A" }}</b></div>
+      </div>
+      {% endfor %}
+    </div>
+  </section>
+
+  <div class="footer-stats">
+    <div><b>25</b><span>input attributes</span><small>Transaction + customer + risk information</small></div>
+    <div><b>3</b><span>ML models</span><small>Logistic Regression, SVM, Isolation Forest</small></div>
+    <div><b>2</b><span>outcomes</span><small>SAFE or FRAUD</small></div>
+  </div>
+</div>
+<script>
+let selectedModel = "Logistic Regression";
+document.querySelectorAll('.model-tab').forEach(btn => btn.addEventListener('click', () => {
+  document.querySelectorAll('.model-tab').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active'); selectedModel = btn.dataset.model;
+}));
+
+document.getElementById('fraudForm').addEventListener('submit', async e => {
+  e.preventDefault();
+  const form=e.target, data={};
+  new FormData(form).forEach((v,k)=>data[k]=v);
+  data.model=selectedModel;
+  const result=document.getElementById('result');
+  const metricsSection=document.getElementById('metricsSection');
+  result.className='result'; result.textContent='Analyzing transaction...';
+  try {
+    const r=await fetch('/predict',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)});
+    const x=await r.json();
+    result.className='result '+(x.prediction==='Fraudulent'?'fraud':'safe');
+    metricsSection.classList.remove('hidden');
+    result.innerHTML=`<strong>${x.prediction==='Fraudulent'?'⚠ FRAUD':'✓ SAFE'}</strong><span> ${x.risk} risk · Fraud probability: ${x.probability}% · Model: ${selectedModel}</span>`;
+  } catch(err) { result.className='result fraud'; result.textContent='Prediction failed. Please check the server.'; }
+});
+</script>
+</body>
+</html>
